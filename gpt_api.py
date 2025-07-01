@@ -62,6 +62,7 @@ CLIENT = {
     "sex": "Male",
     "food_preference": "Healthy gym diet for bulking naturally with 5-days a week workout. Consider protein and creatine count, but prioritise my preferences. No pickles, no overly-spicy stuff, I like fish, Lasagna always wins." 
 }
+
 SYSTEM_MSG =f'''
 You're {CLIENT['name']}'s personal Nutritionist.
 Here's his basic info: {CLIENT}.
@@ -94,7 +95,6 @@ def ask_gpt(meal_options):
 
 def pick_meal(meal_options):
     resp = ask_gpt(meal_options)
-    print(json.dumps(meal_options, indent=4, ensure_ascii=False))
     print(json.dumps(resp, indent=4, ensure_ascii=False))
     return resp
 

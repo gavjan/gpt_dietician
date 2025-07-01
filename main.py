@@ -9,20 +9,50 @@ from selenium.webdriver.common.action_chains import ActionChains
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
+from datetime import datetime, timedelta, date
 from gpt_api import pick_meal
-from datetime import datetime, timedelta
+from tg_api import tg_notify
 
 import time
 import os
+import json
 
 HOME_URL = "https://app.ntfy.pl/"
 CLIENT_FULL_NAME = "Gevorg Chobanyan"
 DAYS_FROM_TODAY = 4
-JS_TIMEOUT = 10
+JS_TIMEOUT = 15
 PAGE_TIMEOUT = 15
 ESC_KEY_DELAY = 0.3
 HEADLESS = True
 DEBUG_PORT = 9222
+JSON_DIR = "/home/cgev/public_html/logs/diet"
+def load_json_today(folder):
+    today = date.today().isoformat()
+    filepath = f"{folder}/{today}.json"
+    if os.path.exists(filepath):
+        with open(filepath, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return None
+
+DAILY_GOALS = {
+    "protein": 180,
+    "creatine": 5,
+    "omega3": 2
+}
+
+def parse_report(report):
+    if not report:
+        return None
+    text = f'''
+Supplements:
+    💪 Protein: {report["protein"]}g
+    🥩 Creatine: {report["creatine"]}g
+    🐟 Omega3: {report["omega3"]}g
+
+Comments: \n{report["meal_comments"]}
+    '''
+    return text
+
 user_data_dir = os.path.abspath("user_data")
 
 options = Options()
@@ -41,6 +71,16 @@ if HEADLESS:
 def init_driver():
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     return driver
+
+def save_json(json_data, folder, days_from_today=0):
+    if not os.path.exists(folder):
+        os.makedirs(folder)
+    target_date = (date.today() + timedelta(days=days_from_today)).isoformat()
+    filepath = f"{folder}/{target_date}.json"
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(json_data, f, indent=4, ensure_ascii=False)
+
+
 
 def date_in_polish(days_from_today=0):
     polish_months = {
@@ -125,9 +165,7 @@ def get_meal_options(driver, meal_i):
         EC.presence_of_element_located((By.XPATH, '//*[@id="root"]/div/main/div/div[3]/div[2]'))
     )
     meal_div = meals_div.find_elements(By.XPATH, './div')[meal_i]
-
-    # Don't really need to use this for now
-    #meal_type = meal_div.find_element(By.XPATH, './div[2]/div[1]/p').text
+    meal_type = meal_div.find_element(By.XPATH, './div[2]/div[1]/p').text
 
     # Click change meal button
     detail_btn = WebDriverWait(meal_div, JS_TIMEOUT).until(
@@ -145,13 +183,14 @@ def get_meal_options(driver, meal_i):
         
         # Hover over div to make buttons appear
         actions = ActionChains(driver)
-        actions.move_to_element(meal_option_div).perform() 
+        actions.move_to_element(meal_option_div).perform()
+        time.sleep(ESC_KEY_DELAY)
         meal_info_button = meal_option_div.find_element(By.XPATH, './/button[@type="button"]')
         meal_info_button.click()
         meal_option = parse_meal_option(driver, meal_option_title)
         meal_options.append(meal_option)
     
-    return meal_options
+    return meal_options, meal_type
 
 
 def select_picked_meal(driver, picked):
@@ -177,19 +216,24 @@ def main():
     protein = 0
     creatine = 0
     omega3 = 0
+    meal_comments = ""
+    meal_options_list = []
 
+    # Load Todays Menu
     driver = init_driver()
     driver.get(HOME_URL)
-
     wait_on_home_page_load(driver)
     forward_days(driver, days_from_today=DAYS_FROM_TODAY)
     
+    # Parse todays meal count
     meals_div = get_meals_div(driver)
     child_divs = meals_div.find_elements(By.XPATH, './div')
+    meal_count = len(child_divs)
     
     # Skip the first one (title), iterate over meals only
-    for i in range(1,len(child_divs)):
-        meal_options = get_meal_options(driver, i)
+    for i in range(1, meal_count):
+        # Get parsed meal options
+        meal_options, meal_type = get_meal_options(driver, i)
 
         # Get picked meal from api
         resp = pick_meal(meal_options)
@@ -197,6 +241,9 @@ def main():
         creatine += resp["creatine"]
         omega3 += resp["omega3"]
         picked = resp["picked_option"]
+        meal_comments += f"{meal_type}: {resp['comments']}\n"
+        meal_options_list.append({"type": meal_type, "options": meal_options})
+
 
         if picked != 0:
             # Something other than default (0) is seleced
@@ -205,9 +252,28 @@ def main():
             # Wait and click X
             time.sleep(ESC_KEY_DELAY)
             ActionChains(driver).send_keys(Keys.ESCAPE).perform()
-
-    print(f"{protein=}, {creatine=}, {omega3=}")
+    
+    # Stop Chromium
     driver.quit()
+    
+    # Save choices and meal reports for upcoming day
+    daily_report = {
+        "protein": DAILY_GOALS["protein"] - protein,
+        "creatine": DAILY_GOALS["creatine"] - creatine,
+        "omega3": DAILY_GOALS["omega3"] - omega3,
+        "meal_comments": meal_comments
+    } 
+    save_json(meal_options_list, f"{JSON_DIR}/meal_options", days_from_today=DAYS_FROM_TODAY)
+    save_json(daily_report, f"{JSON_DIR}/daily_report", days_from_today=DAYS_FROM_TODAY)
+
+    # Send report for today
+    report = load_json_today(f"{JSON_DIR}/daily_report")
+    text = parse_report(report)
+    if text:
+        tg_notify(text)
+    else:
+        print("No meal report for today to send.")
+
 
 if __name__ == "__main__":
     exit(main())
