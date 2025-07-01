@@ -17,15 +17,26 @@ import os
 
 HOME_URL = "https://app.ntfy.pl/"
 CLIENT_FULL_NAME = "Gevorg Chobanyan"
+DAYS_FROM_TODAY = 4
 JS_TIMEOUT = 10
 PAGE_TIMEOUT = 15
 ESC_KEY_DELAY = 0.3
+HEADLESS = True
+DEBUG_PORT = 9222
 user_data_dir = os.path.abspath("user_data")
 
 options = Options()
 options.add_argument("--start-maximized")
 options.add_argument(f"--user-data-dir={user_data_dir}")
-# options.add_argument("--headless") 
+if HEADLESS:
+    print(f'''Warning, running in headless mode. Either set HEADLESS=False or follow these instructions:
+          1. Connect port to the server ssh -L {DEBUG_PORT}:localhost:{DEBUG_PORT} cgev@gavjan.com 
+          2. Go to chrome://inspect/#devices then click Configure, and add localhost:{DEBUG_PORT}
+          3. Remote Target list should refresh and show your instance. Click insect and interact with it
+    ''')
+    options.add_argument("--headless=new")
+    options.add_argument("--window-size=1920,1080")
+    options.add_argument(f"--remote-debugging-port={DEBUG_PORT}")
 
 def init_driver():
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
@@ -49,7 +60,6 @@ def forward_days(driver,days_from_today):
         aria_date = abbr.get_attribute("aria-label")
         date_pl = date_in_polish(days_from_today=days_from_today)
         if aria_date == date_pl:
-            print("clicking {aria_date}")
             abbr.click()
             wait_on_home_page_load(driver)
             return
@@ -170,8 +180,9 @@ def main():
 
     driver = init_driver()
     driver.get(HOME_URL)
+
     wait_on_home_page_load(driver)
-    forward_days(driver, days_from_today=4)
+    forward_days(driver, days_from_today=DAYS_FROM_TODAY)
     
     meals_div = get_meals_div(driver)
     child_divs = meals_div.find_elements(By.XPATH, './div')
@@ -196,7 +207,6 @@ def main():
             ActionChains(driver).send_keys(Keys.ESCAPE).perform()
 
     print(f"{protein=}, {creatine=}, {omega3=}")
-    time.sleep(10)
     driver.quit()
 
 if __name__ == "__main__":

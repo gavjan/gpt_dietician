@@ -94,6 +94,7 @@ def ask_gpt(meal_options):
 
 def pick_meal(meal_options):
     resp = ask_gpt(meal_options)
+    print(json.dumps(meal_options, indent=4, ensure_ascii=False))
     print(json.dumps(resp, indent=4, ensure_ascii=False))
     return resp
 
