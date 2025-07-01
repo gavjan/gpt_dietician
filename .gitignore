@@ -1,0 +1,67 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.env/
+.venv/
+env/
+
+# Pipenv
+Pipfile.lock
+
+# Poetry
+poetry.lock
+
+# MyPy
+.mypy_cache/
+
+# Pyre
+.pyre/
+
+# Pytest
+.pytest_cache/
+
+# Coverage reports
+htmlcov/
+coverage.*
+.cache
+nosetests.xml
+*.cover
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Environments or secrets
+*.env
+.env.*
+secrets.*
+credentials.*
+
+# IDEs and OS
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+Thumbs.db
+
+# Mac/Linux user trash
+.trash/
+*.swp
+*~
+
+# Custom app/output dirs
+logs/
+__output__/
+build/
+dist/
+*.egg-info/
+
+# Optional: exclude your local config files
+config.local.*
+user_data
+
